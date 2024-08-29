@@ -2211,13 +2211,15 @@ RDD::FenceID RenderingDeviceDriverD3D12::fence_create() {
 	ERR_FAIL_NULL_V(event_handle, FenceID());
 
 	FenceInfo *fence = memnew(FenceInfo);
+	ERR_FAIL_NULL_V(fence, FenceID());
+
 	fence->d3d_fence = d3d_fence;
 	fence->event_handle = event_handle;
 	return FenceID(fence);
 }
 
 Error RenderingDeviceDriverD3D12::fence_wait(FenceID p_fence) {
-	FenceInfo *fence = (FenceInfo *)(p_fence.id);
+	FenceInfo *fence = reinterpret_cast<FenceInfo *>(p_fence.id);
 	DWORD res = WaitForSingleObjectEx(fence->event_handle, INFINITE, FALSE);
 #ifdef PIX_ENABLED
 	PIXNotifyWakeFromFenceSignal(fence->event_handle);
@@ -2227,7 +2229,7 @@ Error RenderingDeviceDriverD3D12::fence_wait(FenceID p_fence) {
 }
 
 void RenderingDeviceDriverD3D12::fence_free(FenceID p_fence) {
-	FenceInfo *fence = (FenceInfo *)(p_fence.id);
+	FenceInfo *fence = reinterpret_cast<FenceInfo *>(p_fence.id);
 	CloseHandle(fence->event_handle);
 	memdelete(fence);
 }
