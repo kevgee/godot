@@ -675,15 +675,13 @@ GDExtensionInterfaceFunctionPtr GDExtension::get_interface_function(const String
 }
 
 Error GDExtension::open_library(const String &p_path, const Ref<GDExtensionLoader> &p_loader) {
-	ERR_FAIL_NULL_V_MSG(p_loader, FAILED, "Can't open GDExtension without a loader.");
+	ERR_FAIL_COND_V_MSG(p_loader.is_null(), FAILED, "Can't open GDExtension without a loader.");
 	loader = p_loader;
 
-	String abs_path = ProjectSettings::get_singleton()->globalize_path(p_path);
+	Error err = loader->open_library(p_path);
 
-	Error err = loader->open_library(abs_path);
-
-	ERR_FAIL_COND_V_MSG(err == ERR_FILE_NOT_FOUND, err, "GDExtension dynamic library not found: " + abs_path);
-	ERR_FAIL_COND_V_MSG(err != OK, err, "Can't open GDExtension dynamic library: " + abs_path);
+	ERR_FAIL_COND_V_MSG(err == ERR_FILE_NOT_FOUND, err, "GDExtension dynamic library not found: " + p_path);
+	ERR_FAIL_COND_V_MSG(err != OK, err, "Can't open GDExtension dynamic library: " + p_path);
 
 	err = loader->initialize(&gdextension_get_proc_address, this, &initialization);
 

@@ -446,7 +446,7 @@ static String _fixstr(const String &p_what, const String &p_str) {
 }
 
 static void _pre_gen_shape_list(Ref<ImporterMesh> &mesh, Vector<Ref<Shape3D>> &r_shape_list, bool p_convex) {
-	ERR_FAIL_NULL_MSG(mesh, "Cannot generate shape list with null mesh value.");
+	ERR_FAIL_COND_MSG(mesh.is_null(), "Cannot generate shape list with null mesh value.");
 	if (!p_convex) {
 		Ref<ConcavePolygonShape3D> shape = mesh->create_trimesh_shape();
 		r_shape_list.push_back(shape);
@@ -648,6 +648,9 @@ Node *ResourceImporterScene::_pre_fix_node(Node *p_node, Node *p_root, HashMap<R
 
 	String name = p_node->get_name();
 	NodePath original_path = p_root->get_path_to(p_node); // Used to detect renames due to import hints.
+
+	Ref<Resource> original_meta = memnew(Resource); // Create temp resource to hold original meta
+	original_meta->merge_meta_from(p_node);
 
 	bool isroot = p_node == p_root;
 
@@ -1022,6 +1025,8 @@ Node *ResourceImporterScene::_pre_fix_node(Node *p_node, Node *p_root, HashMap<R
 			print_verbose(vformat("Fix: Renamed %s to %s", original_path, new_path));
 			r_node_renames.push_back({ original_path, p_node });
 		}
+		// If we created new node instead, merge meta values from the original node.
+		p_node->merge_meta_from(*original_meta);
 	}
 
 	return p_node;
@@ -2452,6 +2457,8 @@ Node *ResourceImporterScene::_generate_meshes(Node *p_node, const Dictionary &p_
 		mesh_node->set_transform(src_mesh_node->get_transform());
 		mesh_node->set_skin(src_mesh_node->get_skin());
 		mesh_node->set_skeleton_path(src_mesh_node->get_skeleton_path());
+		mesh_node->merge_meta_from(src_mesh_node);
+
 		if (src_mesh_node->get_mesh().is_valid()) {
 			Ref<ArrayMesh> mesh;
 			if (!src_mesh_node->get_mesh()->has_mesh()) {
@@ -2599,6 +2606,7 @@ Node *ResourceImporterScene::_generate_meshes(Node *p_node, const Dictionary &p_
 				for (int i = 0; i < mesh->get_surface_count(); i++) {
 					mesh_node->set_surface_override_material(i, src_mesh_node->get_surface_material(i));
 				}
+				mesh->merge_meta_from(*src_mesh_node->get_mesh());
 			}
 		}
 
@@ -3096,6 +3104,19 @@ Error ResourceImporterScene::import(const String &p_source_file, const String &p
 		}
 	}
 
+	// Apply RESET animation before serializing.
+	if (_scene_import_type == "PackedScene") {
+		int scene_child_count = scene->get_child_count();
+		for (int i = 0; i < scene_child_count; i++) {
+			AnimationPlayer *ap = Object::cast_to<AnimationPlayer>(scene->get_child(i));
+			if (ap) {
+				if (ap->can_apply_reset()) {
+					ap->apply_reset();
+				}
+			}
+		}
+	}
+
 	if (post_import_script.is_valid()) {
 		post_import_script->init(p_source_file);
 		scene = post_import_script->post_import(scene);
@@ -3114,7 +3135,7 @@ Error ResourceImporterScene::import(const String &p_source_file, const String &p
 	progress.step(TTR("Saving..."), 104);
 
 	int flags = 0;
-	if (EDITOR_GET("filesystem/on_save/compress_binary_resources")) {
+	if (EditorSettings::get_singleton() && EDITOR_GET("filesystem/on_save/compress_binary_resources")) {
 		flags |= ResourceSaver::FLAG_COMPRESS;
 	}
 
