@@ -2244,12 +2244,14 @@ RDD::SemaphoreID RenderingDeviceDriverD3D12::semaphore_create() {
 	ERR_FAIL_COND_V(!SUCCEEDED(res), SemaphoreID());
 
 	SemaphoreInfo *semaphore = memnew(SemaphoreInfo);
+	ERR_FAIL_NULL_V(semaphore, SemaphoreID());
+
 	semaphore->d3d_fence = d3d_fence;
 	return SemaphoreID(semaphore);
 }
 
 void RenderingDeviceDriverD3D12::semaphore_free(SemaphoreID p_semaphore) {
-	SemaphoreInfo *semaphore = (SemaphoreInfo *)(p_semaphore.id);
+	SemaphoreInfo *semaphore = reinterpret_cast<SemaphoreInfo *>(p_semaphore.id);
 	memdelete(semaphore);
 }
 
@@ -2283,6 +2285,7 @@ RDD::CommandQueueID RenderingDeviceDriverD3D12::command_queue_create(CommandQueu
 	ERR_FAIL_COND_V(!SUCCEEDED(res), CommandQueueID());
 
 	CommandQueueInfo *command_queue = memnew(CommandQueueInfo);
+	ERR_FAIL_NULL_V(command_queue, CommandQueueID()); 
 	command_queue->d3d_queue = d3d_queue;
 	return CommandQueueID(command_queue);
 }
@@ -2396,7 +2399,7 @@ RDD::CommandBufferID RenderingDeviceDriverD3D12::command_buffer_create(CommandPo
 }
 
 bool RenderingDeviceDriverD3D12::command_buffer_begin(CommandBufferID p_cmd_buffer) {
-	const CommandBufferInfo *cmd_buf_info = (const CommandBufferInfo *)p_cmd_buffer.id;
+	const CommandBufferInfo *cmd_buf_info = reinterpret_cast<const CommandBufferInfo *>(p_cmd_buffer.id);
 	HRESULT res = cmd_buf_info->cmd_allocator->Reset();
 	ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), false, "Reset failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
 	res = cmd_buf_info->cmd_list->Reset(cmd_buf_info->cmd_allocator.Get(), nullptr);
@@ -2405,7 +2408,7 @@ bool RenderingDeviceDriverD3D12::command_buffer_begin(CommandBufferID p_cmd_buff
 }
 
 bool RenderingDeviceDriverD3D12::command_buffer_begin_secondary(CommandBufferID p_cmd_buffer, RenderPassID p_render_pass, uint32_t p_subpass, FramebufferID p_framebuffer) {
-	const CommandBufferInfo *cmd_buf_info = (const CommandBufferInfo *)p_cmd_buffer.id;
+	const CommandBufferInfo *cmd_buf_info = reinterpret_cast<const CommandBufferInfo *>(p_cmd_buffer.id);
 	HRESULT res = cmd_buf_info->cmd_allocator->Reset();
 	ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), false, "Reset failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
 	res = cmd_buf_info->cmd_list->Reset(cmd_buf_info->cmd_allocator.Get(), nullptr);
@@ -2414,7 +2417,7 @@ bool RenderingDeviceDriverD3D12::command_buffer_begin_secondary(CommandBufferID 
 }
 
 void RenderingDeviceDriverD3D12::command_buffer_end(CommandBufferID p_cmd_buffer) {
-	CommandBufferInfo *cmd_buf_info = (CommandBufferInfo *)p_cmd_buffer.id;
+	CommandBufferInfo *cmd_buf_info = reinterpret_cast<CommandBufferInfo *>(p_cmd_buffer.id);
 	HRESULT res = cmd_buf_info->cmd_list->Close();
 
 	ERR_FAIL_COND_MSG(!SUCCEEDED(res), "Close failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
@@ -2426,7 +2429,7 @@ void RenderingDeviceDriverD3D12::command_buffer_end(CommandBufferID p_cmd_buffer
 }
 
 void RenderingDeviceDriverD3D12::command_buffer_execute_secondary(CommandBufferID p_cmd_buffer, VectorView<CommandBufferID> p_secondary_cmd_buffers) {
-	const CommandBufferInfo *cmd_buf_info = (const CommandBufferInfo *)p_cmd_buffer.id;
+	const CommandBufferInfo *cmd_buf_info = reinterpret_cast<CommandBufferInfo *>(p_cmd_buffer.id);
 	for (uint32_t i = 0; i < p_secondary_cmd_buffers.size(); i++) {
 		const CommandBufferInfo *secondary_cb_info = (const CommandBufferInfo *)p_secondary_cmd_buffers[i].id;
 		cmd_buf_info->cmd_list->ExecuteBundle(secondary_cb_info->cmd_list.Get());
@@ -2487,9 +2490,9 @@ Error RenderingDeviceDriverD3D12::swap_chain_resize(CommandQueueID p_cmd_queue, 
 	DEV_ASSERT(p_cmd_queue.id != 0);
 	DEV_ASSERT(p_swap_chain.id != 0);
 
-	CommandQueueInfo *command_queue = (CommandQueueInfo *)(p_cmd_queue.id);
-	SwapChain *swap_chain = (SwapChain *)(p_swap_chain.id);
-	RenderingContextDriverD3D12::Surface *surface = (RenderingContextDriverD3D12::Surface *)(swap_chain->surface);
+	CommandQueueInfo *command_queue =  reinterpret_cast<CommandQueueInfo *>(p_cmd_queue.id);
+	SwapChain *swap_chain = reinterpret_cast<SwapChain *>(p_swap_chain.id);
+	RenderingContextDriverD3D12::Surface *surface = reinterpret_cast<RenderingContextDriverD3D12::Surface *>(swap_chain->surface);
 	if (surface->width == 0 || surface->height == 0) {
 		// Very likely the window is minimized, don't create a swap chain.
 		return ERR_SKIP;
